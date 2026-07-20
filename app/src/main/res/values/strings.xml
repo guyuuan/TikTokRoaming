@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">TikTokRoaming</string>
+    <string name="module_description">为 TikTok 提供可配置的国家、语言、时区和网络环境。</string>
+</resources>
