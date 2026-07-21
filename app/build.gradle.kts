@@ -26,7 +26,9 @@ val latestVersionTag =
   gitOutput("tag", "--list", "--sort=-version:refname")
     .lineSequence()
     .firstOrNull(String::isNotBlank)
-val versionTag = headVersionTag ?: latestVersionTag ?: defaultVersionTag
+val requestedReleaseVersionTag =
+  providers.gradleProperty("releaseVersionTag").orNull?.trim()?.takeIf(String::isNotBlank)
+val versionTag = requestedReleaseVersionTag ?: headVersionTag ?: latestVersionTag ?: defaultVersionTag
 val commitId = gitOutput("rev-parse", "--short=7", "HEAD").ifBlank { "unknown" }
 val commitCount = gitOutput("rev-list", "--count", "HEAD").toIntOrNull() ?: 1
 val computedVersionName = "$versionTag-$commitId"
