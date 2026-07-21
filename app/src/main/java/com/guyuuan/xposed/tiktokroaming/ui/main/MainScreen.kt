@@ -34,14 +34,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.guyuuan.xposed.tiktokroaming.model.CountryProfile
 import com.guyuuan.xposed.tiktokroaming.model.CountryProfiles
 import com.guyuuan.xposed.tiktokroaming.settings.ModuleSettings
+import com.guyuuan.xposed.tiktokroaming.settings.PackageManagerLauncherIconController
 import com.guyuuan.xposed.tiktokroaming.settings.RemoteSettingsRepository
 import com.guyuuan.xposed.tiktokroaming.settings.TikTokTargets
 import com.guyuuan.xposed.tiktokroaming.settings.XposedServiceRegistry
@@ -49,9 +52,18 @@ import com.guyuuan.xposed.tiktokroaming.theme.TikTokRoamingTheme
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
+  val context = LocalContext.current
   val repository = remember { RemoteSettingsRepository(XposedServiceRegistry.service) }
-  val viewModel: MainScreenViewModel = viewModel { MainScreenViewModel(repository) }
+  val launcherIconController =
+    remember(context) { PackageManagerLauncherIconController(context.applicationContext) }
+  val viewModel: MainScreenViewModel =
+    viewModel { MainScreenViewModel(repository, launcherIconController) }
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+  LifecycleResumeEffect(viewModel) {
+    viewModel.refreshLauncherIconState()
+    onPauseOrDispose {}
+  }
 
   when (val current = state) {
     MainScreenUiState.Loading -> Unit
@@ -63,6 +75,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
         onSelectProfile = viewModel::selectProfile,
         onSetEnabled = viewModel::setEnabled,
         onSetHideVpn = viewModel::setHideVpn,
+        onSetLauncherIconHidden = viewModel::setLauncherIconHidden,
         modifier = modifier,
       )
   }
@@ -75,6 +88,7 @@ private fun SettingsScreen(
   onSelectProfile: (CountryProfile) -> Unit,
   onSetEnabled: (Boolean) -> Unit,
   onSetHideVpn: (Boolean) -> Unit,
+  onSetLauncherIconHidden: (Boolean) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   var showCountryPicker by rememberSaveable { mutableStateOf(false) }
@@ -93,6 +107,7 @@ private fun SettingsScreen(
           state = state,
           onSetEnabled = onSetEnabled,
           onSetHideVpn = onSetHideVpn,
+          onSetLauncherIconHidden = onSetLauncherIconHidden,
         )
       }
       item {
@@ -159,6 +174,7 @@ private fun SettingsCard(
   state: MainScreenUiState.Ready,
   onSetEnabled: (Boolean) -> Unit,
   onSetHideVpn: (Boolean) -> Unit,
+  onSetLauncherIconHidden: (Boolean) -> Unit,
 ) {
   Card(modifier = Modifier.fillMaxWidth()) {
     Column {
@@ -176,6 +192,14 @@ private fun SettingsCard(
         checked = state.settings.hideVpn,
         enabled = state.serviceConnected && state.settings.enabled,
         onCheckedChange = onSetHideVpn,
+      )
+      HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+      SwitchRow(
+        title = "隐藏桌面图标",
+        description = "从桌面启动器中隐藏模块入口，不影响当前设置页",
+        checked = state.launcherIconHidden,
+        enabled = true,
+        onCheckedChange = onSetLauncherIconHidden,
       )
     }
   }
@@ -316,10 +340,12 @@ private fun SettingsScreenPreview() {
           frameworkLabel = "LSPosed · API 102",
           settings = ModuleSettings(),
           selectedProfile = CountryProfiles.default,
+          launcherIconHidden = false,
         ),
       onSelectProfile = {},
       onSetEnabled = {},
       onSetHideVpn = {},
+      onSetLauncherIconHidden = {},
     )
   }
 }

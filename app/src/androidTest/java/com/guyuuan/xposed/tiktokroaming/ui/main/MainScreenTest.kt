@@ -7,20 +7,17 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-/** UI tests for [com.guyuuan.xposed.tiktokroaming.ui.main.MainScreen]. */
 class MainScreenTest {
 
   @get:Rule val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
   @Before
   fun setup() {
-    composeTestRule.setContent { MainScreen(FAKE_DATA) }
+    composeTestRule.setContent { MainScreen() }
   }
 
   @Test
-  fun firstItem_exists() {
-    FAKE_DATA.forEach { composeTestRule.onNodeWithText("Hello $it!").assertExists() }
+  fun launcherIconSetting_exists() {
+    composeTestRule.onNodeWithText("隐藏桌面图标").assertExists()
   }
 }
-
-private val FAKE_DATA = listOf("Sample1", "Sample2", "Sample3")
