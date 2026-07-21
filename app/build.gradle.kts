@@ -1,7 +1,39 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+}
+
+val releaseSigningPropertiesFile = rootProject.file("keystore.properties")
+val releaseSigningEnvironmentVariables =
+  mapOf(
+    "storeFile" to "TIKTOKROAMING_STORE_FILE",
+    "storePassword" to "TIKTOKROAMING_STORE_PASSWORD",
+    "keyAlias" to "TIKTOKROAMING_KEY_ALIAS",
+    "keyPassword" to "TIKTOKROAMING_KEY_PASSWORD",
+  )
+val releaseSigningProperties =
+  Properties()
+    .apply {
+      if (releaseSigningPropertiesFile.isFile) {
+        releaseSigningPropertiesFile.reader(Charsets.UTF_8).use { reader -> load(reader) }
+      }
+      releaseSigningEnvironmentVariables.forEach { (propertyName, environmentVariable) ->
+        providers.environmentVariable(environmentVariable).orNull
+          ?.takeIf(String::isNotBlank)
+          ?.let { setProperty(propertyName, it) }
+      }
+    }
+    .takeUnless { it.isEmpty }
+
+releaseSigningProperties?.let { properties ->
+  val requiredProperties = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+  val missingProperties = requiredProperties.filter { properties.getProperty(it).isNullOrBlank() }
+  check(missingProperties.isEmpty()) {
+    "Missing release signing properties in ${releaseSigningPropertiesFile.name}: ${missingProperties.joinToString()}"
+  }
 }
 
 android {
@@ -15,10 +47,23 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        releaseSigningProperties?.let { properties ->
+            create("release") {
+                storeFile = rootProject.file(properties.getProperty("storeFile"))
+                storePassword = properties.getProperty("storePassword")
+                keyAlias = properties.getProperty("keyAlias")
+                keyPassword = properties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

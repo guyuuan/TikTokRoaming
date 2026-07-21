@@ -56,6 +56,43 @@ cd TikTokRoaming
 
 调试 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
+### 构建 Release
+
+Release 构建默认启用 R8 代码压缩、混淆和资源压缩，并保留及重写 libxposed 的模块入口。没有签名配置时可以生成仅供检查的 unsigned APK：
+
+```bash
+./gradlew :app:assembleRelease
+```
+
+用于分发时，先在仓库外生成并妥善备份签名文件：
+
+```bash
+keytool -genkeypair -v \
+  -keystore /path/to/secure/tiktok-roaming-release.jks \
+  -alias tiktok-roaming \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+复制 `keystore.properties.example` 为仓库根目录下的 `keystore.properties`，填写签名文件的绝对路径、别名和密码。真实的 `keystore.properties`、`*.jks` 和 `*.keystore` 已被 Git 忽略：
+
+```properties
+storeFile=/path/to/secure/tiktok-roaming-release.jks
+storePassword=你的密钥库密码
+keyAlias=tiktok-roaming
+keyPassword=你的密钥密码
+```
+
+`keystore.properties` 按 UTF-8 读取；Windows 路径建议使用 `/`，如使用反斜杠则必须写成 `\\`。限制本地配置文件权限后再构建签名版本：
+
+```bash
+chmod 600 keystore.properties
+./gradlew :app:assembleRelease --no-configuration-cache
+```
+
+CI 环境无需创建 `keystore.properties`，可以通过密钥管理服务注入 `TIKTOKROAMING_STORE_FILE`、`TIKTOKROAMING_STORE_PASSWORD`、`TIKTOKROAMING_KEY_ALIAS` 和 `TIKTOKROAMING_KEY_PASSWORD` 四个环境变量。
+
+已签名 APK 位于 `app/build/outputs/apk/release/`，R8 映射文件位于 `app/build/outputs/mapping/release/mapping.txt`。请将签名文件做加密离线备份，将密码保存在密码管理器中；后续版本必须继续使用同一签名。签名文件、密码和映射文件都不应提交到仓库，但应按发布版本单独安全归档对应的 `mapping.txt`，用于反混淆崩溃信息。
+
 运行本地单元测试：
 
 ```bash
