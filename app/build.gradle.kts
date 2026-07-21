@@ -6,6 +6,36 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+fun gitOutput(vararg arguments: String): String =
+  providers
+    .exec {
+      commandLine("git", *arguments)
+      isIgnoreExitValue = true
+    }
+    .standardOutput
+    .asText
+    .get()
+    .trim()
+
+val defaultVersionTag = "v1.0.0"
+val headVersionTag =
+  gitOutput("tag", "--points-at", "HEAD", "--sort=-version:refname")
+    .lineSequence()
+    .firstOrNull(String::isNotBlank)
+val latestVersionTag =
+  gitOutput("tag", "--list", "--sort=-version:refname")
+    .lineSequence()
+    .firstOrNull(String::isNotBlank)
+val versionTag = headVersionTag ?: latestVersionTag ?: defaultVersionTag
+val commitId = gitOutput("rev-parse", "--short=7", "HEAD").ifBlank { "unknown" }
+val commitCount = gitOutput("rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+val computedVersionName = "$versionTag-$commitId"
+val isDailyBuild =
+  providers.gradleProperty("dailyBuild").orNull?.equals("true", ignoreCase = true) == true
+val apkVersion = if (isDailyBuild) computedVersionName else versionTag
+val apkFileName =
+  "${rootProject.name}-${apkVersion.replace(Regex("[^A-Za-z0-9._-]"), "-")}.apk"
+
 val releaseSigningPropertiesFile = rootProject.file("keystore.properties")
 val releaseSigningEnvironmentVariables =
   mapOf(
@@ -43,8 +73,8 @@ android {
         applicationId = "com.guyuuan.xposed.tiktokroaming"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = commitCount
+        versionName = computedVersionName
     }
 
     signingConfigs {
@@ -83,6 +113,12 @@ android {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
     }
+}
+
+androidComponents {
+  onVariants(selector().withBuildType("release")) { variant ->
+    variant.outputs.forEach { output -> output.outputFileName.set(apkFileName) }
+  }
 }
 
 kotlin {
